@@ -1,0 +1,77 @@
+1. Alguém deve obter getUserMedia() - CLIENT1/Init/Caller/Offerer - Este é o navegador que inicia tudo. 
+2. CLIENT1 cria RTCPeerConnection
+3. peerConnection precisa de servidores STUN
+    - Por que? Precisaremos de candidatos ICE mais tarde
+    - Esta é a parte que ajuda o outro navegador a encontrar o CLIENT1
+    - Então o CLIENT2 precisará de candidatos ICE para encontrar o CLIENT1. Precisaremos enviar STUN Servers para a RTCPeerConnection ser obtida
+4. CLIENT1 adiciona localstream tracks a peerConnection
+    - precisamos associar o feed CLIENT1 a peerConnection
+5. CLIENT1 cria uma oferta (Offer) -> "const offer = await peerConnection.createOffer();"
+    - precisavamos de peerConnection com tracks
+    - Offer = RTCSessionDescription
+        1. SDP - codec/informação de resolução
+        2. Type/Tipo (E para o CLIENT1 será a oferta/Offer)
+6. CLIENT1 entrega a oferta para pc.setLocalDescription (sendo pc = peerConnection)
+~7. Candidatos ICE agora podem começar a entrar (ASYNC)
+
+SINALIZAÇÃO (alguém para ajudar o navegador a encontrar/falar com cada um)
+    - Esse será o nosso servidor Socket.io 
+
+8. CLIENT1 emite uma oferta (Offer)
+    - o servidor socket.io a mantém/arnazena para o outro navegador
+    - associar ao CLIENT1
+~9. Quando 7 acontecer, emitir os candidatos ICE até o servidor de sinalização
+                        io.on('connection',(socket)=>{
+                            console.log("Someone has connected");
+                        })
+    - o servidor socket.io o mantém para o outro navegador
+    - associar com CLIENT1
+
+CLIENT1 e o servidor de sinalização aguardam.
+    - aguardar um respondente/CLIENT2/receptor
+
+10. CLIENT2 carrega a página da web com io.connect() -> "const socket = io.connect('https://localhost:8181/')"
+    - um novo cliente é conectado ao servidor signaling/socket.io
+11. socket.io emite o RTCSessionDesc para o novo cliente
+    - O servidor de sinalização vê que alguém acabou de entrar e diz: Hey, uma oferta a ser enviada!
+
+Agora será repetido o mesmo processo inicial para o CLIENT2
+
+12. CLIENT2 executa getUserMedia()
+13. CLIENT2 cria um peerConnection()
+    - passa servidores STUN
+14. CLIENT2 adiciona faixas de localstream para peerconnection
+
+15. CLIENT2 cria uma resposta (createAnswer());
+    - createAnswer = RTCSessionDescription (sdp/type)
+    - Desta vez, o tipo ao invés de Offer será uma Answer
+16. CLIENT2 entrega a resposta para pc.setLocalDescription
+17. Como CLIENT2 tem a oferta, CLIENT2 pode entregá-la para pc.setRemoteDescription
+~18. quando setLocalDescription for executada, começa a coletar candidatos ICE (ASYNC)
+
+O servidor de sinalização está esperando...
+
+19. CLIENT2 emite resposta (RTCSessionDesc - sdp/type) para o servidor de sinalização
+~20. CLIENT2 escutará tracks/ICE from remote.
+    - e pronto (o cliente também fez tudo)
+    - aguardando candidatos ICE
+    - aguardando tracks
+
+21. O servidor de sinalização escuta a resposta, emite a resposta ao CLIENT1 (RTCSessionDesc - sdp/type)
+22. CLIENT1 pega a resposta e a entrega para pc.setRemoteDesc
+    - Então, neste ponto, o CLIENT1 um agora definiu sua própria descrição local com sua Offer e está definido como descrição remota com sua resposta
+    - O CLIENT2 fez exatamente o oposto. Ele definiu uma descrição local com sua resposta e definiu uma descrição remota com a oferta do outro navegador.
+
+Certo, então ambos têm os SDP's neste momento. Eles trocaram informações. Eles são capazes de conversar entre si
+
+~23. CLIENT1 aguarda candidatos ICE e tracks
+
+Itens 21. e 23. aguardam ICE. Assim que o ICE for trocado, as tracks serão trocadas
+
+Em resumo, parece muito, mas todas essas peças móveis acontecerão quase simultaneamente.
+
+Basicamente é só isso, temos o navegador à esquerda, que compartilha a sua mídia, cria algum candidatos ICE, gera uma oferta e envia ao servidor.
+
+O cara do outro lado faz exatamente a mesma coisa.
+Enviará para o servidor. O servidor enviará para ambos os lados e então eles poderão começar a conversar.
+
